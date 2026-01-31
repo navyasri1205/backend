@@ -1,8 +1,10 @@
 import { Router } from 'express';
 import { z } from 'zod';
 import { prisma } from '../db.js';
+import { Prisma } from '@prisma/client';
 
 const router = Router();
+
 const querySchema = z.object({
   userId: z.string().optional(),
   status: z.enum(['scheduled', 'sent']).optional(),
@@ -19,12 +21,16 @@ router.get('/scheduled', async (req, res) => {
     if (!q.success) {
       return res.status(400).json({ error: 'Invalid query', details: q.error.flatten() });
     }
+
     const { userId, limit, offset } = q.data;
 
-    const where: { status: string[]; campaign?: { userId: string } } = {
+    const where = {
       status: { in: ['pending', 'delayed'] },
-    };
-    if (userId) where.campaign = { userId };
+    } as unknown as Prisma.EmailJobWhereInput;
+
+    if (userId) {
+      where.campaign = { userId };
+    }
 
     const [jobs, total] = await Promise.all([
       prisma.emailJob.findMany({
@@ -61,12 +67,16 @@ router.get('/sent', async (req, res) => {
     if (!q.success) {
       return res.status(400).json({ error: 'Invalid query', details: q.error.flatten() });
     }
+
     const { userId, limit, offset } = q.data;
 
-    const where: { status: string[]; campaign?: { userId: string } } = {
+    const where = {
       status: { in: ['sent', 'failed'] },
-    };
-    if (userId) where.campaign = { userId };
+    } as unknown as Prisma.EmailJobWhereInput;
+
+    if (userId) {
+      where.campaign = { userId };
+    }
 
     const [jobs, total] = await Promise.all([
       prisma.emailJob.findMany({

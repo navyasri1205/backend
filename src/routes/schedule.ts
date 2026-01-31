@@ -1,8 +1,9 @@
 import { Router } from 'express';
-import { config } from '../config.js';
 import { z } from 'zod';
 import { prisma } from '../db.js';
-import { emailQueue, type EmailJobData } from '../queue.js';
+import { config } from '../config.js';
+import { emailQueue } from '../queue.js';
+import type { EmailJobData } from '../queue.js';
 
 const router = Router();
 
@@ -22,8 +23,12 @@ router.post('/', async (req, res) => {
   try {
     const parsed = ScheduleBodySchema.safeParse(req.body);
     if (!parsed.success) {
-      return res.status(400).json({ error: 'Validation failed', details: parsed.error.flatten() });
+      return res.status(400).json({
+        error: 'Validation failed',
+        details: parsed.error.flatten(),
+      });
     }
+
     const {
       userId,
       userEmail,
@@ -37,11 +42,11 @@ router.post('/', async (req, res) => {
     } = parsed.data;
 
     const start = new Date(startTime);
-    if (start.getTime() < Date.now()) {
+    if (start.getTime() <= Date.now()) {
       return res.status(400).json({ error: 'startTime must be in the future' });
     }
 
-    // Ensure user exists (upsert from Google)
+    // Ensure user exists
     const user = await prisma.user.upsert({
       where: { id: userId },
       create: {
@@ -50,9 +55,13 @@ router.post('/', async (req, res) => {
         name: userName ?? null,
         googleId: userId,
       },
-      update: { email: userEmail, name: userName },
+      update: {
+        email: userEmail,
+        name: userName,
+      },
     });
 
+    // Create campaign
     const campaign = await prisma.emailCampaign.create({
       data: {
         userId: user.id,
@@ -65,9 +74,13 @@ router.post('/', async (req, res) => {
       },
     });
 
-    const jobs: { id: string; recipientEmail: string; scheduledAt: Date }[] = [];
+    // Create DB jobs first (idempotency)
+    const jobs: { id: string; recipientEmail: string; scheduledAt: Date }[] =
+      [];
+
     for (let i = 0; i < recipients.length; i++) {
       const scheduledAt = new Date(start.getTime() + i * delayBetweenMs);
+
       const job = await prisma.emailJob.create({
         data: {
           campaignId: campaign.id,
@@ -78,6 +91,7 @@ router.post('/', async (req, res) => {
           status: 'pending',
         },
       });
+
       jobs.push({
         id: job.id,
         recipientEmail: job.recipientEmail,
@@ -85,9 +99,10 @@ router.post('/', async (req, res) => {
       });
     }
 
-    // Add BullMQ delayed jobs (no cron) - each job runs at its scheduled time
+    // Add BullMQ delayed jobs
     for (const j of jobs) {
       const delayMs = Math.max(0, j.scheduledAt.getTime() - Date.now());
+
       const data: EmailJobData = {
         emailJobId: j.id,
         campaignId: campaign.id,
@@ -96,10 +111,12 @@ router.post('/', async (req, res) => {
         body,
         senderKey: userId,
       };
+
       const bullJob = await emailQueue.add(data, {
         delay: delayMs,
         jobId: j.id,
       });
+
       await prisma.emailJob.update({
         where: { id: j.id },
         data: { bullJobId: bullJob.id ?? undefined },
@@ -113,12 +130,14 @@ router.post('/', async (req, res) => {
       jobs: jobs.slice(0, 10),
     });
   } catch (err) {
-    const message = err instanceof Error ? err.message : String(err);
     console.error('Schedule error:', err);
-    // In development return the real error to help debugging
+
     if (config.nodeEnv !== 'production') {
-      return res.status(500).json({ error: message, stack: (err instanceof Error ? err.stack : undefined) });
+      return res.status(500).json({
+        error: err instanceof Error ? err.message : String(err),
+      });
     }
+
     return res.status(500).json({ error: 'Failed to schedule emails' });
   }
 });
