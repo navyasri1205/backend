@@ -38,7 +38,7 @@ async function processEmailJob(job: Job<EmailJobData>): Promise<void> {
   if (!allowed) {
     const nextHour = getNextHourWindowStart();
     const delayMs = Math.max(0, nextHour.getTime() - Date.now());
-    await emailQueue.add(job.data, { delay: delayMs, jobId: `${emailJobId}-retry-${nextHour.getTime()}` });
+    await emailQueue.add('send-email', job.data, { delay: delayMs, jobId: `${emailJobId}-retry-${nextHour.getTime()}` });
     await prisma.emailJob.update({
       where: { id: emailJobId },
       data: { status: 'delayed', scheduledAt: nextHour, updatedAt: new Date() },

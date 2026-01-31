@@ -58,6 +58,6 @@ export async function sendMail(options: SendMailOptions): Promise<{ messageId: s
     text: options.text,
     html: options.html ?? options.text.replace(/\n/g, '<br>'),
   });
-  const previewUrl = nodemailer.getTestMessageUrl(info) ?? undefined;
+  const previewUrl = nodemailer.getTestMessageUrl(info) || undefined;
   return { messageId: info.messageId, previewUrl };
 }

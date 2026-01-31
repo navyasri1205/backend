@@ -22,6 +22,7 @@ export const config = {
   // Ethereal
   etherealUser: process.env.ETHEREAL_USER ?? '',
   etherealPass: process.env.ETHEREAL_PASS ?? '',
+  jwtSecret: process.env.JWT_SECRET ?? '',
 };
 
 if (!config.databaseUrl) {

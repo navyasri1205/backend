@@ -112,7 +112,7 @@ router.post('/', async (req, res) => {
         senderKey: userId,
       };
 
-      const bullJob = await emailQueue.add(data, {
+      const bullJob = await emailQueue.add('send-email', data, {
         delay: delayMs,
         jobId: j.id,
       });

@@ -1,5 +1,4 @@
 import { Router } from 'express';
-import fetch from 'node-fetch';
 import jwt from 'jsonwebtoken';
 import { prisma } from '../db.js';
 import { config } from '../config.js';
@@ -48,7 +47,7 @@ router.post('/google', async (req, res) => {
 
     // Sign a session token
     const payload = { id: user.id };
-    const token = jwt.sign(payload, config.jwtSecret || 'dev-secret', { expiresIn: '7d' });
+    const token = jwt.sign(payload, config.jwtSecret ?? 'dev-secret', { expiresIn: '7d' });
 
     // Set httpOnly cookie
     res.cookie('session', token, {

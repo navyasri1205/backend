@@ -50,9 +50,9 @@ export async function getSenderHourlyCount(senderId: string): Promise<number> {
  */
 export async function canSendEmail(senderId?: string): Promise<boolean> {
   const [globalCount, senderCount] = await Promise.all([
-    redis.get(globalKey(getHourWindow())).then((c) => (c ? parseInt(c, 10) : 0)),
+    redis.get(globalKey(getHourWindow())).then((c: string | null) => (c ? parseInt(c, 10) : 0)),
     senderId
-      ? redis.get(senderKey(getHourWindow(), senderId)).then((c) => (c ? parseInt(c, 10) : 0))
+      ? redis.get(senderKey(getHourWindow(), senderId)).then((c: string | null) => (c ? parseInt(c, 10) : 0))
       : Promise.resolve(0),
   ]);
 
