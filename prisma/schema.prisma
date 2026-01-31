@@ -1,0 +1,55 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id            String    @id @default(cuid())
+  email         String    @unique
+  name          String?
+  avatar        String?
+  googleId      String?   @unique
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+  emailCampaigns EmailCampaign[]
+}
+
+model EmailCampaign {
+  id              String   @id @default(cuid())
+  userId          String
+  user            User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  subject         String
+  body            String   @db.Text
+  startTime       DateTime
+  delayBetweenMs  Int      // delay between each email in ms
+  hourlyLimit     Int      // max emails per hour (global or per-sender)
+  status          String   @default("scheduled") // scheduled | sending | completed | cancelled
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+  emailJobs       EmailJob[]
+}
+
+model EmailJob {
+  id              String   @id @default(cuid())
+  campaignId      String
+  campaign        EmailCampaign @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+  recipientEmail  String
+  subject         String
+  body            String   @db.Text
+  scheduledAt     DateTime
+  sentAt          DateTime?
+  status          String   @default("pending") // pending | sent | failed | delayed
+  bullJobId       String?  @unique // BullMQ job id for idempotency
+  errorMessage    String?  @db.Text
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  @@index([campaignId])
+  @@index([status])
+  @@index([scheduledAt])
+  @@index([bullJobId])
+}
